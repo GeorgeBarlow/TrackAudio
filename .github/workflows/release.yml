@@ -27,11 +27,10 @@ jobs:
       - name: Generate changelog
         id: changelog
         run: |
-          echo "changelog<<EOF" >> $GITHUB_OUTPUT
-          echo "Full Changelog: ${{ steps.previoustag.outputs.tag }}...${{ github.ref_name }}" >> $GITHUB_OUTPUT
-          echo "" >> $GITHUB_OUTPUT
-          git log --pretty=format:"* %s by @%an in %h" ${{ steps.previoustag.outputs.tag }}..${{ github.ref_name }} >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          CHANGELOG=$(git log --pretty=format:"* %s by @%an in %h" ${{ steps.previoustag.outputs.tag }}..${{ github.ref_name }})
+          echo "changelog<<CHANGELOG_EOF" >> "$GITHUB_OUTPUT"
+          echo "$CHANGELOG" >> "$GITHUB_OUTPUT"
+          echo "CHANGELOG_EOF" >> "$GITHUB_OUTPUT"
 
       - name: Create Draft Release
         id: create_release
