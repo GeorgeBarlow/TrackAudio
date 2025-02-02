@@ -27,9 +27,8 @@ jobs:
       - name: Generate changelog
         id: changelog
         run: |
-          CHANGELOG=$(git log --pretty=format:"* %s by @%an in %h" ${{ steps.previoustag.outputs.tag }}..${{ github.ref_name }})
           echo "changelog<<CHANGELOG_EOF" >> "$GITHUB_OUTPUT"
-          echo "$CHANGELOG" >> "$GITHUB_OUTPUT"
+          echo "**Full Changelog**: https://github.com/pierr3/TrackAudio/compare/${{ steps.previoustag.outputs.tag }}...${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
           echo "CHANGELOG_EOF" >> "$GITHUB_OUTPUT"
 
       - name: Create Draft Release
@@ -39,7 +38,7 @@ jobs:
           draft: true
           tag_name: ${{ github.ref_name }}
           body: |
-            Release notes coming soon...
+            ### INSERT RELEASE NOTES ###
 
             ${{ steps.changelog.outputs.changelog }}
         env:
