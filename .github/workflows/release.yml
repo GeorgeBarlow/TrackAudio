@@ -71,10 +71,9 @@ jobs:
           p12-file-base64: ${{ secrets.APPLE_CERT_DATA }}
           p12-password: ${{ secrets.APPLE_CERT_PASSWORD }}
 
-      # (Additional steps for Ubuntu SFML or repository replacement would go here if needed)
-
-      - name: Build backend (x64)
-        if: matrix.arch == 'x64'
+      # Windows build steps
+      - name: Build backend (Windows)
+        if: matrix.os == 'windows-2022' && steps.restore-cache.outputs.backend != 'true'
         run: |
           npm -g i cmake-js
           cd backend/
@@ -85,10 +84,45 @@ jobs:
           cd ..
           npm install ./backend/trackaudio-afv-1.0.0.tgz
 
-      # -----------------------------
-      # Windows: Package and publish using electron-builder.
-      # This step expects your package.json to define:
-      # "build:win:publish": "npm run build && electron-builder --win --publish always -c electron-builder-config.js"
+      - name: Install cached backend (Windows)
+        if: matrix.os == 'windows-2022' && steps.restore-cache.outputs.backend == 'true'
+        run: npm install ./backend/trackaudio-afv-1.0.0.tgz
+
+      # macOS build steps
+      - name: Build backend (macOS)
+        if: matrix.os == 'macos-latest' && steps.restore-cache.outputs.backend != 'true'
+        run: |
+          npm -g i cmake-js
+          cd backend/
+          npm install
+          cmake-js compile -B Release -a x64
+          node custom_build.mjs
+          npm pack
+          cd ..
+          npm install ./backend/trackaudio-afv-1.0.0.tgz
+
+      - name: Install cached backend (macOS)
+        if: matrix.os == 'macos-latest' && steps.restore-cache.outputs.backend == 'true'
+        run: npm install ./backend/trackaudio-afv-1.0.0.tgz
+
+      # Linux build steps
+      - name: Build backend (Linux)
+        if: matrix.os == 'ubuntu-latest' && steps.restore-cache.outputs.backend != 'true'
+        run: |
+          npm -g i cmake-js
+          cd backend/
+          npm install
+          cmake-js compile -B Release -a x64
+          node custom_build.mjs
+          npm pack
+          cd ..
+          npm install ./backend/trackaudio-afv-1.0.0.tgz
+
+      - name: Install cached backend (Linux)
+        if: matrix.os == 'ubuntu-latest' && steps.restore-cache.outputs.backend == 'true'
+        run: npm install ./backend/trackaudio-afv-1.0.0.tgz
+
+      # Package and publish steps remain the same
       - name: Package and publish Windows app
         if: matrix.os == 'windows-2022'
         shell: bash
@@ -96,8 +130,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # -----------------------------
-      # macOS packaging (manual artifact upload)
       - name: Package app for macOS
         if: matrix.os == 'macos-latest'
         shell: bash
@@ -113,8 +145,6 @@ jobs:
           npm run build:mac -- --${{ matrix.arch }}
           rm ./.a.p8
 
-      # -----------------------------
-      # Linux packaging (manual artifact upload)
       - name: Package app for Linux
         if: matrix.os == 'ubuntu-latest'
         shell: bash
