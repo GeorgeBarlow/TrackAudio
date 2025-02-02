@@ -4,11 +4,11 @@ module.exports = {
   directories: {
     buildResources: 'build'
   },
-  publish: {
-    provider: 's3',
-    bucket: 'trackaudio',
-    region: 'eu-west-2'
-  },
+  publish: [{
+    provider: 'github',
+    owner: 'GeorgeBarlow',
+    repo: 'TrackAudio'
+  }],
   files: [
     '!**/.vscode/*',
     '!src/*',
@@ -22,7 +22,6 @@ module.exports = {
   asarUnpack: ['resources/**', './src/renderer/src/assets/md80_error.mp3'],
   win: {
     executableName: 'trackaudio',
-
     extraFiles: [
       {
         from: 'backend/build/Release/',
@@ -76,4 +75,4 @@ module.exports = {
   electronDownload: {
     mirror: 'https://npmmirror.com/mirrors/electron/'
   }
-};
+}

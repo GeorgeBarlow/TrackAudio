@@ -2,6 +2,8 @@ name: Release
 
 on:
   workflow_dispatch:
+  release:
+    types: [created]
 
 jobs:
   build:
@@ -10,14 +12,14 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-2022]
-        arch: [x64, arm64]
+        os: [windows-2022] # Temporarily windows-only
+        arch: [x64]
         node-version: [20.x]
-        exclude:
-          - os: windows-2022
-            arch: arm64
-          - os: ubuntu-latest
-            arch: arm64
+        # exclude:  # Not needed while only running Windows
+        #   - os: windows-2022
+        #     arch: arm64
+        #   - os: ubuntu-latest
+        #     arch: arm64
 
     steps:
       - name: Checkout code
@@ -44,57 +46,33 @@ jobs:
         with:
           python-version: '3.11.x'
 
-      - name: Update cmake
+      - name: Update cmake (non-macOS)
         if: matrix.os != 'macos-latest'
         run: |
           pip install cmake
           cmake --version
 
-      - name: Setup environment
+      - name: Setup macOS environment
         if: matrix.os == 'macos-latest'
         run: |
           brew update
           brew upgrade cmake
           cmake --version
 
-      - name: Installing codesign certificates
+      - name: Install macOS codesign certificates
         if: matrix.os == 'macos-latest'
         uses: apple-actions/import-codesign-certs@v3
         with:
           p12-file-base64: ${{ secrets.APPLE_CERT_DATA }}
           p12-password: ${{ secrets.APPLE_CERT_PASSWORD }}
 
-      - name: Install SFML native dependencies
+      - name: Install SFML dependencies (Ubuntu x64)
         if: matrix.os == 'ubuntu-latest' && matrix.arch == 'x64'
         run: |
           sudo apt-get update
           sudo apt-get install -y libx11-dev libxrandr-dev libxcursor-dev libxi-dev libudev-dev libgl1-mesa-dev pkg-config libxtst-dev libxinerama-dev libx11-xcb-dev libxkbcommon-dev libxkbcommon-x11-dev libxkbfile-dev libxt-dev
 
-      - name: Replace repositories with amd64 and arm64 repositories
-        if: matrix.os == 'ubuntu-latest' && matrix.arch == 'arm64'
-        run: |
-          echo "deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ jammy main restricted universe multiverse" | sudo tee /etc/apt/sources.list
-          echo "deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ jammy-updates main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
-          echo "deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ jammy-security main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
-          echo "deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ jammy-backports main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
-          echo "deb [arch=amd64] http://archive.canonical.com/ubuntu/ jammy partner" | sudo tee -a /etc/apt/sources.list
-          echo "deb [arch=armhf,arm64] http://ports.ubuntu.com/ jammy main restricted" | sudo tee -a /etc/apt/sources.list
-          echo "deb [arch=armhf,arm64] http://ports.ubuntu.com/ jammy-updates main restricted" | sudo tee -a /etc/apt/sources.list
-          echo "deb [arch=armhf,arm64] http://ports.ubuntu.com/ jammy universe" | sudo tee -a /etc/apt/sources.list
-          echo "deb [arch=armhf,arm64] http://ports.ubuntu.com/ jammy-updates universe" | sudo tee -a /etc/apt/sources.list
-          echo "deb [arch=armhf,arm64] http://ports.ubuntu.com/ jammy multiverse" | sudo tee -a /etc/apt/sources.list
-          echo "deb [arch=armhf,arm64] http://ports.ubuntu.com/ jammy-updates multiverse" | sudo tee -a /etc/apt/sources.list
-          echo "deb [arch=armhf,arm64] http://ports.ubuntu.com/ jammy-backports main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
-
-      - name: Install cross-compilation to arm on linux dependencies
-        if: matrix.os == 'ubuntu-latest' && matrix.arch == 'arm64'
-        run: |
-          sudo apt-get remove libgpg-error-dev
-          sudo dpkg --add-architecture arm64
-          sudo apt-get update
-          sudo apt-get install -y desktop-file-utils ninja-build gcc-aarch64-linux-gnu:amd64 g++-aarch64-linux-gnu:amd64 python3-jinja2:amd64 libgcrypt20:arm64 libgcrypt20-dev:arm64 libgpg-error-dev:arm64 libx11-dev:arm64 libxrandr-dev:arm64 libxcursor-dev:arm64 libxi-dev:arm64 libudev-dev:arm64 libgl1-mesa-dev:arm64
-
-      - name: Install dependencies and building backend (x64)
+      - name: Install dependencies and build backend (x64)
         if: matrix.arch == 'x64'
         run: |
           npm -g i cmake-js
@@ -107,7 +85,7 @@ jobs:
           npm install ./backend/trackaudio-afv-1.0.0.tgz
           npm install
 
-      - name: Install dependencies and building backend (macOs arm64)
+      - name: Install dependencies and build backend (macOS arm64)
         if: matrix.arch == 'arm64' && matrix.os == 'macos-latest'
         run: |
           npm -g i cmake-js
@@ -120,34 +98,23 @@ jobs:
           npm install ./backend/trackaudio-afv-1.0.0.tgz
           npm install
 
-      - name: Install dependencies and building backend (linux arm64 cross compile)
-        if: matrix.arch == 'arm64' && matrix.os == 'ubuntu-latest'
-        run: |
-          npm -g i cmake-js
-          cd backend/
-          npm install
-          cmake-js compile -B Release -a arm64 --prefer-clang false --CD -DVCPKG_TARGET_TRIPLET=arm64-linux
-          node custom_build.mjs
-          npm pack
-          cd ..
-          npm install ./backend/trackaudio-afv-1.0.0.tgz
-          npm install
-
-      - name: Package app
-        if: matrix.os == 'windows-2022'
-        shell: bash
-        run: npm run build:win
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Install notarization tools
+      - name: Install macOS notarization tools
         if: matrix.os == 'macos-latest'
         run: |
           cat << EOF > ./.a.p8
           ${{ secrets.APPLE_API_KEY }}
           EOF
 
-      - name: Package app
+      # Package apps for different platforms
+      - name: Package Windows app
+        if: matrix.os == 'windows-2022'
+        shell: bash
+        run: npm run build:win:publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Package macOS app
         if: matrix.os == 'macos-latest'
         shell: bash
         env:
@@ -159,14 +126,15 @@ jobs:
           npm run build:mac -- --${{ matrix.arch }}
           rm ./.a.p8
 
-      - name: Package app
+      - name: Package Linux app
         if: matrix.os == 'ubuntu-latest'
         shell: bash
         run: npm run build:linux -- --${{ matrix.arch }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Rename installer to human friendly name
+      # Rename macOS arm64 installer
+      - name: Rename macOS arm64 installer
         if: matrix.os == 'macos-latest' && matrix.arch == 'arm64'
         run: |
           cd dist/
@@ -174,13 +142,15 @@ jobs:
           new_dmg_file=$(echo $dmg_file | sed 's/arm64/apple-silicon/')
           mv $dmg_file $new_dmg_file
 
+      # Get release info
       - id: relinfo
         uses: pozetroninc/github-action-get-latest-release@master
         with:
           repository: pierr3/TrackAudio
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload artifacts
+      # Upload artifacts for each platform
+      - name: Upload Windows artifacts
         uses: softprops/action-gh-release@v2
         if: matrix.os == 'windows-2022'
         with:
@@ -188,15 +158,16 @@ jobs:
           files: |
             dist/*.exe
             dist/*.zip
+            dist/latest.yml
 
-      - name: Upload artifacts
+      - name: Upload macOS artifacts
         uses: softprops/action-gh-release@v2
         if: matrix.os == 'macos-latest'
         with:
           tag_name: ${{ steps.relinfo.outputs.release }}
           files: 'dist/*.dmg'
 
-      - name: Upload artifacts
+      - name: Upload Linux artifacts
         uses: softprops/action-gh-release@v2
         if: matrix.os == 'ubuntu-latest'
         with:
