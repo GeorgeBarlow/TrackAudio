@@ -15,7 +15,7 @@ jobs:
     environment: Release
     strategy:
       matrix:
-        os: [windows-2022]  # Windows, macOS, and Linux
+        os: [windows-2022] # Windows, macOS, and Linux
         arch: [x64]
         node-version: [20.x]
 
@@ -126,7 +126,7 @@ jobs:
       - name: Package and publish Windows app
         if: matrix.os == 'windows-2022'
         shell: bash
-        run: npm run build:win:publish
+        run: npm run build:win -- --publish=always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -142,13 +142,13 @@ jobs:
           cat << EOF > ./.a.p8
           ${{ secrets.APPLE_CERT_KEY }}
           EOF
-          npm run build:mac -- --${{ matrix.arch }}
+          npm run build:mac -- --${{ matrix.arch }} --publish=never
           rm ./.a.p8
 
       - name: Package app for Linux
         if: matrix.os == 'ubuntu-latest'
         shell: bash
-        run: npm run build:linux -- --${{ matrix.arch }}
+        run: npm run build:linux -- --${{ matrix.arch }} --publish=never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
