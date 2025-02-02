@@ -3,24 +3,59 @@ name: Release
 on:
   push:
     tags:
-      - '*'
-  workflow_dispatch:
+      - 'v*'
 
 env:
   ELECTRON_CACHE: .cache/electron
   ELECTRON_BUILDER_CACHE: .cache/electron-builder
 
 jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.create_release.outputs.id }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get previous tag
+        id: previoustag
+        run: |
+          echo "tag=$(git describe --tags --abbrev=0 HEAD^)" >> $GITHUB_OUTPUT
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "Full Changelog: ${{ steps.previoustag.outputs.tag }}...${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          git log --pretty=format:"* %s by @%an in %h" ${{ steps.previoustag.outputs.tag }}..${{ github.ref_name }} >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create Draft Release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          tag_name: ${{ github.ref_name }}
+          body: |
+            Release notes coming soon...
+
+            ${{ steps.changelog.outputs.changelog }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   build:
-    name: Build on ${{ matrix.os }} - ${{ matrix.arch }}
+    needs: create-release # Make build job wait for release creation
     runs-on: ${{ matrix.os }}
     environment: Release
     strategy:
       matrix:
-        # Supported OS: Windows, macOS, and Ubuntu (Linux)
-        os: [windows-2022, macos-latest, ubuntu-latest]
+        os: [windows-2022] # Windows, macOS, and Linux
         arch: [x64]
         node-version: [20.x]
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -73,7 +108,7 @@ jobs:
           p12-file-base64: ${{ secrets.APPLE_CERT_DATA }}
           p12-password: ${{ secrets.APPLE_CERT_PASSWORD }}
 
-      # Backend build steps for each platform (build vs. cache logic)
+      # Windows build steps
       - name: Build backend (Windows)
         if: matrix.os == 'windows-2022' && steps.restore-cache.outputs.backend != 'true'
         run: |
@@ -90,6 +125,7 @@ jobs:
         if: matrix.os == 'windows-2022' && steps.restore-cache.outputs.backend == 'true'
         run: npm install ./backend/trackaudio-afv-1.0.0.tgz
 
+      # macOS build steps
       - name: Build backend (macOS)
         if: matrix.os == 'macos-latest' && steps.restore-cache.outputs.backend != 'true'
         run: |
@@ -106,6 +142,7 @@ jobs:
         if: matrix.os == 'macos-latest' && steps.restore-cache.outputs.backend == 'true'
         run: npm install ./backend/trackaudio-afv-1.0.0.tgz
 
+      # Linux build steps
       - name: Build backend (Linux)
         if: matrix.os == 'ubuntu-latest' && steps.restore-cache.outputs.backend != 'true'
         run: |
@@ -122,7 +159,7 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && steps.restore-cache.outputs.backend == 'true'
         run: npm install ./backend/trackaudio-afv-1.0.0.tgz
 
-      # Packaging steps
+      # Package and publish steps remain the same
       - name: Package and publish Windows app
         if: matrix.os == 'windows-2022'
         shell: bash
@@ -160,9 +197,29 @@ jobs:
           new_dmg_file=$(echo $dmg_file | sed 's/arm64/apple-silicon/')
           mv $dmg_file $new_dmg_file
 
-      # Upload built artifacts for later use in the release job.
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v3
+      # -----------------------------
+      # For macOS and Linux, retrieve release info and manually attach artifacts.
+      - id: relinfo
+        if: matrix.os != 'windows-2022'
+        uses: pozetroninc/github-action-get-latest-release@master
         with:
-          name: build-${{ matrix.os }}-${{ matrix.arch }}
-          path: dist/*
+          repository: pierr3/TrackAudio
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifacts for macOS
+        if: matrix.os == 'macos-latest'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.relinfo.outputs.release }}
+          files: 'dist/*.dmg'
+
+      - name: Upload artifacts for Linux
+        if: matrix.os == 'ubuntu-latest'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.relinfo.outputs.release }}
+          files: |
+            dist/*.deb
+            dist/*.AppImage
+            dist/*.zsync
+            dist/*.snap
