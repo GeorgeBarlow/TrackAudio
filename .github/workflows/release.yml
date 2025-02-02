@@ -41,7 +41,8 @@ jobs:
       - name: Restore cache
         id: restore-cache
         uses: ./.github/actions/restore-cache
-
+        with:
+          backend: 'true'
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
