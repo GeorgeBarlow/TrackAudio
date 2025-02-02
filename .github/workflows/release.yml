@@ -2,6 +2,8 @@ name: Release
 
 on:
   workflow_dispatch:
+  release:
+    types: [created]
 
 env:
   ELECTRON_CACHE: .cache/electron
@@ -11,17 +13,11 @@ jobs:
   build:
     runs-on: ${{ matrix.os }}
     environment: Release
-
     strategy:
       matrix:
-        os: [windows-2022] # Temporarily windows-only
+        os: [windows-2022]  # Windows, macOS, and Linux
         arch: [x64]
         node-version: [20.x]
-        # exclude:  # Not needed while only running Windows
-        #   - os: windows-2022
-        #     arch: arm64
-        #   - os: ubuntu-latest
-        #     arch: arm64
 
     steps:
       - name: Checkout code
@@ -43,6 +39,7 @@ jobs:
         uses: ./.github/actions/restore-cache
         with:
           backend: 'true'
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -54,7 +51,7 @@ jobs:
         with:
           python-version: '3.11.x'
 
-      - name: Update cmake
+      - name: Update cmake (non-macOS)
         if: matrix.os != 'macos-latest'
         run: |
           pip install cmake
@@ -67,42 +64,14 @@ jobs:
           brew upgrade cmake
           cmake --version
 
-      - name: Installing codesign certificates
+      - name: Install macOS codesign certificates
         if: matrix.os == 'macos-latest'
         uses: apple-actions/import-codesign-certs@v3
         with:
           p12-file-base64: ${{ secrets.APPLE_CERT_DATA }}
           p12-password: ${{ secrets.APPLE_CERT_PASSWORD }}
 
-      - name: Install SFML native dependencies (Ubuntu x64)
-        if: matrix.os == 'ubuntu-latest' && matrix.arch == 'x64'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libx11-dev libxrandr-dev libxcursor-dev libxi-dev libudev-dev libgl1-mesa-dev pkg-config libxtst-dev libxinerama-dev libx11-xcb-dev libxkbcommon-dev libxkbcommon-x11-dev libxkbfile-dev libxt-dev
-
-      - name: Replace repositories with amd64 and arm64 repositories (Ubuntu arm64)
-        if: matrix.os == 'ubuntu-latest' && matrix.arch == 'arm64'
-        run: |
-          echo "deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ jammy main restricted universe multiverse" | sudo tee /etc/apt/sources.list
-          echo "deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ jammy-updates main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
-          echo "deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ jammy-security main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
-          echo "deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ jammy-backports main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
-          echo "deb [arch=amd64] http://archive.canonical.com/ubuntu/ jammy partner" | sudo tee -a /etc/apt/sources.list
-          echo "deb [arch=armhf,arm64] http://ports.ubuntu.com/ jammy main restricted" | sudo tee -a /etc/apt/sources.list
-          echo "deb [arch=armhf,arm64] http://ports.ubuntu.com/ jammy-updates main restricted" | sudo tee -a /etc/apt/sources.list
-          echo "deb [arch=armhf,arm64] http://ports.ubuntu.com/ jammy universe" | sudo tee -a /etc/apt/sources.list
-          echo "deb [arch=armhf,arm64] http://ports.ubuntu.com/ jammy-updates universe" | sudo tee -a /etc/apt/sources.list
-          echo "deb [arch=armhf,arm64] http://ports.ubuntu.com/ jammy multiverse" | sudo tee -a /etc/apt/sources.list
-          echo "deb [arch=armhf,arm64] http://ports.ubuntu.com/ jammy-updates multiverse" | sudo tee -a /etc/apt/sources.list
-          echo "deb [arch=armhf,arm64] http://ports.ubuntu.com/ jammy-backports main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
-
-      - name: Install cross-compilation dependencies (Ubuntu arm64)
-        if: matrix.os == 'ubuntu-latest' && matrix.arch == 'arm64'
-        run: |
-          sudo apt-get remove libgpg-error-dev
-          sudo dpkg --add-architecture arm64
-          sudo apt-get update
-          sudo apt-get install -y desktop-file-utils ninja-build gcc-aarch64-linux-gnu:amd64 g++-aarch64-linux-gnu:amd64 python3-jinja2:amd64 libgcrypt20:arm64 libgcrypt20-dev:arm64 libgpg-error-dev:arm64 libx11-dev:arm64 libxrandr-dev:arm64 libxcursor-dev:arm64 libxi-dev:arm64 libudev-dev:arm64 libgl1-mesa-dev:arm64
+      # (Additional steps for Ubuntu SFML or repository replacement would go here if needed)
 
       - name: Build backend (x64)
         if: matrix.arch == 'x64'
@@ -116,33 +85,10 @@ jobs:
           cd ..
           npm install ./backend/trackaudio-afv-1.0.0.tgz
 
-      - name: Build backend (macOs arm64)
-        if: matrix.arch == 'arm64' && matrix.os == 'macos-latest'
-        run: |
-          npm -g i cmake-js
-          cd backend/
-          npm install
-          cmake-js compile -B Release -a arm64
-          node custom_build.mjs
-          npm pack
-          cd ..
-          npm install ./backend/trackaudio-afv-1.0.0.tgz
-
-      - name: Build backend (linux arm64 cross compile)
-        if: matrix.arch == 'arm64' && matrix.os == 'ubuntu-latest'
-        run: |
-          npm -g i cmake-js
-          cd backend/
-          npm install
-          cmake-js compile -B Release -a arm64 --prefer-clang false --CD -DVCPKG_TARGET_TRIPLET=arm64-linux
-          node custom_build.mjs
-          npm pack
-          cd ..
-          npm install ./backend/trackaudio-afv-1.0.0.tgz
-
-      # Package and publish Windows app using electron-builder.
-      # This command uses the "build:win:publish" script, which should run:
-      #    npm run build && electron-builder --win --publish always -c electron-builder-config.js
+      # -----------------------------
+      # Windows: Package and publish using electron-builder.
+      # This step expects your package.json to define:
+      # "build:win:publish": "npm run build && electron-builder --win --publish always -c electron-builder-config.js"
       - name: Package and publish Windows app
         if: matrix.os == 'windows-2022'
         shell: bash
@@ -150,25 +96,25 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install notarization tools (macOS)
-        if: matrix.os == 'macos-latest'
-        run: |
-          cat << EOF > ./.a.p8
-          ${{ secrets.APPLE_API_KEY }}
-          EOF
-
+      # -----------------------------
+      # macOS packaging (manual artifact upload)
       - name: Package app for macOS
         if: matrix.os == 'macos-latest'
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           APPLE_API_KEY: './.a.p8'
-          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_CERT_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_CERT_ISSUER }}
         run: |
+          cat << EOF > ./.a.p8
+          ${{ secrets.APPLE_CERT_KEY }}
+          EOF
           npm run build:mac -- --${{ matrix.arch }}
           rm ./.a.p8
 
+      # -----------------------------
+      # Linux packaging (manual artifact upload)
       - name: Package app for Linux
         if: matrix.os == 'ubuntu-latest'
         shell: bash
@@ -176,16 +122,16 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Rename macOS installer to human-friendly name
-        if: matrix.os == 'macos-latest' && matrix.arch == 'arm64'
+      - name: Rename macOS installer to human friendly name
+        if: matrix.os == 'macos-latest' && matrix.arch == 'x64'
         run: |
           cd dist/
           dmg_file=$(find . -name "*.dmg" -type f)
           new_dmg_file=$(echo $dmg_file | sed 's/arm64/apple-silicon/')
           mv $dmg_file $new_dmg_file
 
-      # For macOS and Linux, if you still wish to attach artifacts manually,
-      # use the following steps. (Windows artifacts are now published automatically.)
+      # -----------------------------
+      # For macOS and Linux, retrieve release info and manually attach artifacts.
       - id: relinfo
         if: matrix.os != 'windows-2022'
         uses: pozetroninc/github-action-get-latest-release@master

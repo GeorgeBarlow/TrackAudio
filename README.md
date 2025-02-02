@@ -1,5 +1,4 @@
 <!-- markdownlint-disable MD033 MD045 MD007 -->
-<!-- no toc -->
 <h1>
   <img src="https://raw.githubusercontent.com/pierr3/TrackAudio/main/build/icon.png" width="50" valign="middle">
   <span style="font-size: 2em; font-weight: bold">TrackAudio</span>
@@ -24,6 +23,7 @@
 - 🎮 Comprehensive Stream Deck integration
 - 🪟 Compact mini-mode with transparency options
 - 🔌 Developer-friendly SDK with WebSocket and HTTP support
+- 🔄 Automatic Updates [Windows]
 
 ## Table of Contents
 
