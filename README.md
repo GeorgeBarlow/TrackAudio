@@ -1,10 +1,15 @@
 <!-- markdownlint-disable MD033 MD045 MD007 -->
+<!-- no toc -->
 <h1>
   <img src="https://raw.githubusercontent.com/pierr3/TrackAudio/main/build/icon.png" width="50" valign="middle">
   <span style="font-size: 2em; font-weight: bold">TrackAudio</span>
 </h1>
 
-[![Release](https://img.shields.io/github/v/release/pierr3/TrackAudio)](https://github.com/pierr3/TrackAudio/releases)
+[![Release](https://img.shields.io/github/v/release/pierr3/TrackAudio?style=for-the-badge&color=2f3345)](https://github.com/pierr3/TrackAudio/releases)
+[![Windows Download](https://img.shields.io/badge/Windows-Download-2ea043?style=for-the-badge&logo=windows&logoColor=white&labelColor=2f3345)](https://georgebarlow.github.io/trackaudio-download?windows)
+[![macOS Silicon Download](https://img.shields.io/badge/Silicon-Download-2ea043?style=for-the-badge&logo=apple&logoColor=white&labelColor=2f3345)](https://georgebarlow.github.io/trackaudio-download?silicon)
+[![macOS Intel Download](https://img.shields.io/badge/Intel-Download-2ea043?style=for-the-badge&logo=apple&logoColor=white&labelColor=2f3345)](https://georgebarlow.github.io/trackaudio-download?intel)
+[![Linux Download](https://img.shields.io/badge/Debian-Download-2ea043?style=for-the-badge&logo=linux&logoColor=white&labelColor=2f3345)](https://georgebarlow.github.io/trackaudio-download?linux)
 
 > **New to TrackAudio?** 📖 Check out the [Key Features](#key-features) and [FAQ](#faq) before getting started!
 
@@ -23,7 +28,6 @@
 - 🎮 Comprehensive Stream Deck integration
 - 🪟 Compact mini-mode with transparency options
 - 🔌 Developer-friendly SDK with WebSocket and HTTP support
-- 🔄 Automatic Updates [Windows]
 
 ## Table of Contents
 
