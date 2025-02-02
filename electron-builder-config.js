@@ -8,8 +8,7 @@ module.exports = {
     provider: 'github',
     owner: 'GeorgeBarlow',
     repo: 'TrackAudio',
-    releaseType: "draft",
-    vPrefixedTagName: false
+    releaseType: 'draft'
   },
   files: [
     '!**/.vscode/*',
@@ -77,4 +76,4 @@ module.exports = {
   electronDownload: {
     mirror: 'https://npmmirror.com/mirrors/electron/'
   }
-}
+};
